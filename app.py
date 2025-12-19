@@ -2,16 +2,10 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# ======================
-# Load model artifacts
-# ======================
 model = joblib.load("lang_nb_model.pkl")
 vectorizer = joblib.load("lang_vectorizer.pkl")
 classes = model.classes_
 
-# ======================
-# Helper functions
-# ======================
 def confidence_label(p):
     if p >= 0.75:
         return "High"
@@ -53,14 +47,9 @@ def detect_words(text, threshold=0.10, unknown_threshold=0.25):
 
     return results
 
-
-# ======================
-# Streamlit UI
-# ======================
 st.set_page_config(page_title="Language Detection NLP", layout="centered")
 
 st.title("🌍 Multilingual Word Language Detection")
-st.caption("Character-level Naive Bayes | Probabilistic & Transparent NLP")
 
 st.markdown(
     """
@@ -74,18 +63,14 @@ The system is designed to be **conservative and transparent**:
 """
 )
 
-# ======================
-# User input
-# ======================
 user_input = st.text_area(
     "Enter words (space or newline separated):",
-    placeholder="saya naive reoreorie",
+    placeholder="i eat にちは sapi",
     height=120
 )
 
-# ======================
-# Prediction
-# ======================
+predict_clicked = st.button("🔍 Predict")
+
 if user_input:
     results = detect_words(user_input)
 
@@ -121,31 +106,13 @@ if user_input:
                     )
                     st.bar_chart(df_probs.set_index("Language"))
 
-        # ======================
-        # Summary
-        # ======================
+
         st.markdown("## 📊 Summary")
         st.write(f"Known words: **{known_count}**")
         st.write(f"Unknown words: **{unknown_count}**")
 
-# ======================
-# Transparency section
-# ======================
-st.markdown("---")
-st.markdown("## 🧠 Model Transparency")
-
 st.write(
     """
-**Model type:** Character-level Naive Bayes  
-**Features:** Character n-grams (1–4)  
-**Output:** Probability distribution per word  
-
-### Design principles
-- Avoid forced predictions
-- Explicitly show uncertainty
-- Reject low-confidence outputs
-- Flag ambiguous cases
-
 ### Known limitations
 - Non-words may still receive low probabilities
 - Similar languages can be ambiguous
