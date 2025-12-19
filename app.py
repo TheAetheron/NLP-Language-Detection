@@ -101,7 +101,23 @@ if user_input:
                         probs[:5],
                         columns=["Language", "Probability"]
                     )
-                    st.bar_chart(df_probs.set_index("Language"))
+                    chart = (
+                        alt.Chart(df_probs)
+                        .mark_bar(size=12)
+                        .encode(
+                             y=alt.Y(
+                                "Language:N",
+                                sort="-x",                     # highest prob on top
+                                axis=alt.Axis(labelAngle=0)    # normal horizontal labels
+                            ),
+                            x=alt.X(
+                                "Probability:Q",
+                                scale=alt.Scale(domain=[0, 1]) # probability scale
+                            ),
+                            tooltip=["Language", "Probability"]
+                        )
+                        .properties(height=120)
+                    )
 
 
         st.markdown("## 📊 Summary")
