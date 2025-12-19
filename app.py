@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import altair as alt
 
 model = joblib.load("lang_nb_model.pkl")
 vectorizer = joblib.load("lang_vectorizer.pkl")
@@ -97,10 +98,25 @@ if user_input:
                         st.warning("⚠️ Ambiguous prediction — multiple languages likely")
 
                     df_probs = pd.DataFrame(
-                        probs[:5],
-                        columns=["Language", "Probability"]
+                    probs[:5],
+                    columns=["Language", "Probability"]
                     )
-                    st.bar_chart(df_probs.set_index("Language"))
+
+                chart = (
+                    alt.Chart(df_probs)
+                    .mark_bar(size=20)   # 👈 controls bar thickness (smaller = thinner)
+                    .encode(
+                        x=alt.X(
+                            "Language:N",
+                            axis=alt.Axis(labelAngle=0)  # 👈 keep labels horizontal
+                        ),
+                        y=alt.Y("Probability:Q"),
+                        tooltip=["Language", "Probability"]
+                    )
+                    .properties(height=200)  # 👈 keeps chart compact
+                )
+
+                st.altair_chart(chart, use_container_width=True)
 
 
         st.markdown("## 📊 Summary")
