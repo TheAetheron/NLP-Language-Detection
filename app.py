@@ -1,88 +1,157 @@
 import streamlit as st
+import pandas as pd
 import joblib
 
-# -------------------------------
-# Load model & vectorizer
-# -------------------------------
-@st.cache_resource
-def load_model():
-    model = joblib.load("lang_nb_model.pkl")
-    vectorizer = joblib.load("lang_vectorizer.pkl")
-    return model, vectorizer
+# ======================
+# Load model artifacts
+# ======================
+model = joblib.load("lang_nb_model.pkl")
+vectorizer = joblib.load("lang_vectorizer.pkl")
+classes = joblib.load("lang_classes.pkl")
 
-model, vectorizer = load_model()
+# ======================
+# Helper functions
+# ======================
+def confidence_label(p):
+    if p >= 0.75:
+        return "High"
+    elif p >= 0.40:
+        return "Medium"
+    else:
+        return "Low"
 
 
-# -------------------------------
-# Detection logic
-# -------------------------------
-def detect_possible_languages(
-    text,
-    threshold=0.25,
-    min_len=3
-):
-    words = text.split()
+def is_ambiguous(word_probs, margin=0.10):
+    if len(word_probs) < 2:
+        return False
+    return abs(word_probs[0][1] - word_probs[1][1]) < margin
+
+
+def detect_words(text, threshold=0.10, unknown_threshold=0.25):
+    words = [w.strip() for w in text.split() if w.strip()]
+    if not words:
+        return []
 
     X = vectorizer.transform(words)
     probs = model.predict_proba(X)
-    classes = model.classes_
 
     results = []
 
     for i, word in enumerate(words):
-        # Reject very short or non-alphabetic tokens
-        if len(word) < min_len or not word.isalpha():
-            results.append((word, ["Unknown"]))
-            continue
-
-        possible_langs = [
-            lang
+        word_probs = [
+            (lang, float(p))
             for lang, p in zip(classes, probs[i])
             if p >= threshold
         ]
 
-        if not possible_langs:
-            possible_langs = ["Unknown"]
+        word_probs.sort(key=lambda x: x[1], reverse=True)
 
-        results.append((word, possible_langs))
+        if not word_probs or word_probs[0][1] < unknown_threshold:
+            results.append((word, [("Unknown", 1.0)]))
+        else:
+            results.append((word, word_probs))
 
     return results
 
 
-# -------------------------------
+# ======================
 # Streamlit UI
-# -------------------------------
-st.set_page_config(
-    page_title="Multilingual Language Analyzer",
-    layout="centered"
+# ======================
+st.set_page_config(page_title="Language Detection NLP", layout="centered")
+
+st.title("🌍 Multilingual Word Language Detection")
+st.caption("Character-level Naive Bayes | Probabilistic & Transparent NLP")
+
+st.markdown(
+    """
+This application detects the **most likely language of each word**
+using a **character n-gram Naive Bayes model**.
+
+The system is designed to be **conservative and transparent**:
+- Shows probabilities
+- Flags ambiguity
+- Rejects low-confidence predictions
+"""
 )
 
-st.title("🌍 Multilingual Language Analyzer")
-st.write(
-    "This app analyzes each word and outputs **all possible languages** "
-    "based on character-level probabilities. "
-    "Words that do not match any learned language are labeled **Unknown**."
+# ======================
+# User input
+# ======================
+user_input = st.text_area(
+    "Enter words (space or newline separated):",
+    placeholder="saya naive reoreorie",
+    height=120
 )
 
-text_input = st.text_input(
-    "Enter text",
-    placeholder="Saya is naive bayes roeireirpepre"
-)
+# ======================
+# Prediction
+# ======================
+if user_input:
+    results = detect_words(user_input)
 
-if st.button("Analyze"):
-    if text_input.strip() == "":
-        st.warning("Please enter some text.")
+    if not results:
+        st.warning("No valid input detected.")
     else:
-        results = detect_possible_languages(text_input)
+        known_count = 0
+        unknown_count = 0
 
-        st.subheader("Results")
+        st.markdown("## 🔍 Analysis Results")
 
-        for word, langs in results:
-            st.code(
-                f"{word:<15} → {', '.join(langs)}",
-                language="text"
-            )
+        for word, probs in results:
+            with st.expander(f"Word: **{word}**"):
+                if probs[0][0] == "Unknown":
+                    st.error("❌ Unknown word — low confidence prediction")
+                    unknown_count += 1
+                else:
+                    top_lang, top_prob = probs[0]
+                    known_count += 1
 
-st.caption(
-    "Model: Character-level Naive Bayes | Output reflects linguistic ambiguity"
+                    st.write(f"**Prediction:** {top_lang}")
+                    st.write(
+                        f"**Confidence:** {top_prob:.2f} "
+                        f"({confidence_label(top_prob)})"
+                    )
+
+                    if is_ambiguous(probs):
+                        st.warning("⚠️ Ambiguous prediction — multiple languages likely")
+
+                    df_probs = pd.DataFrame(
+                        probs[:5],
+                        columns=["Language", "Probability"]
+                    )
+                    st.bar_chart(df_probs.set_index("Language"))
+
+        # ======================
+        # Summary
+        # ======================
+        st.markdown("## 📊 Summary")
+        st.write(f"Known words: **{known_count}**")
+        st.write(f"Unknown words: **{unknown_count}**")
+
+# ======================
+# Transparency section
+# ======================
+st.markdown("---")
+st.markdown("## 🧠 Model Transparency")
+
+st.write(
+    """
+**Model type:** Character-level Naive Bayes  
+**Features:** Character n-grams (1–4)  
+**Output:** Probability distribution per word  
+
+### Design principles
+- Avoid forced predictions
+- Explicitly show uncertainty
+- Reject low-confidence outputs
+- Flag ambiguous cases
+
+### Known limitations
+- Non-words may still receive low probabilities
+- Similar languages can be ambiguous
+- Word-level detection lacks sentence context
+"""
 )
+
+st.markdown("### 🌐 Supported Languages")
+st.write(", ".join(sorted(classes)))
