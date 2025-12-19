@@ -55,7 +55,6 @@ st.title("🌍 Multilingual Word Language Detection")
 st.markdown(
     """
 This application detects the **most likely language of each word**
-using a **character n-gram Naive Bayes model**.
 
 """
 )
